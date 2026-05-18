@@ -1,2 +1,0 @@
-# Jarvis
-AI Personal Assisistant
