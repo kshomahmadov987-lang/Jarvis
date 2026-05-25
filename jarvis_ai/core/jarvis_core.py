@@ -4,8 +4,7 @@ Main orchestrator for all Jarvis modules
 """
 
 import os
-import sys
-from typing import Optional, Callable, Dict
+from typing import Optional, Callable, Dict, List
 from datetime import datetime
 
 
@@ -15,6 +14,8 @@ class JarvisCore:
     Orchestrates voice recognition, speech synthesis, command processing,
     and system integrations.
     """
+    
+    DEFAULT_WAKE_WORDS = ["jarvis", "hey"]
     
     def __init__(self, name: str = "Jarvis", language: str = "en"):
         """
@@ -28,6 +29,7 @@ class JarvisCore:
         self.language = language
         self.is_listening = False
         self.commands: Dict[str, Callable] = {}
+        self.command_aliases: Dict[str, str] = {}
         self._initialize_modules()
         self._register_default_commands()
         
@@ -37,31 +39,39 @@ class JarvisCore:
         self.speech_engine = None
         self.command_processor = None
         self.office_controller = None
-        self.visual_core = None
         
-        try:
-            from ..engines.audio_engine import AudioEngine
-            self.audio_engine = AudioEngine()
-        except ImportError:
-            print("[WARNING] Audio engine not available")
-            
-        try:
-            from ..engines.speech_engine import SpeechEngine
-            self.speech_engine = SpeechEngine(language=self.language)
-        except ImportError:
-            print("[WARNING] Speech engine not available")
-            
-        try:
-            from ..engines.command_processor import CommandProcessor
-            self.command_processor = CommandProcessor()
-        except ImportError:
-            print("[WARNING] Command processor not available")
-            
-        try:
-            from ..engines.office_controller import OfficeController
-            self.office_controller = OfficeController()
-        except ImportError:
-            print("[WARNING] Office controller not available")
+        module_initializers = [
+            ("Audio engine", self._init_audio_engine),
+            ("Speech engine", self._init_speech_engine),
+            ("Command processor", self._init_command_processor),
+            ("Office controller", self._init_office_controller),
+        ]
+        
+        for module_name, init_func in module_initializers:
+            try:
+                init_func()
+            except ImportError:
+                print(f"[WARNING] {module_name} not available")
+    
+    def _init_audio_engine(self):
+        """Initialize the audio engine module."""
+        from jarvis_ai.engines.audio_engine import AudioEngine
+        self.audio_engine = AudioEngine()
+    
+    def _init_speech_engine(self):
+        """Initialize the speech engine module."""
+        from jarvis_ai.engines.speech_engine import SpeechEngine
+        self.speech_engine = SpeechEngine(language=self.language)
+    
+    def _init_command_processor(self):
+        """Initialize the command processor module."""
+        from jarvis_ai.engines.command_processor import CommandProcessor
+        self.command_processor = CommandProcessor()
+    
+    def _init_office_controller(self):
+        """Initialize the office controller module."""
+        from jarvis_ai.engines.office_controller import OfficeController
+        self.office_controller = OfficeController()
             
     def _register_default_commands(self):
         """Register built-in voice commands."""
@@ -77,15 +87,20 @@ class JarvisCore:
         }
         self.commands.update(default_commands)
         
-    def register_command(self, phrase: str, handler: Callable):
+    def register_command(self, phrase: str, handler: Callable, aliases: List[str] = None):
         """
-        Register a custom command handler.
+        Register a custom command handler with optional aliases.
         
         Args:
             phrase: Voice phrase to trigger the command
             handler: Function to call when phrase is detected
+            aliases: List of alternative phrases that map to this command
         """
         self.commands[phrase.lower()] = handler
+        
+        if aliases:
+            for alias in aliases:
+                self.command_aliases[alias.lower()] = phrase.lower()
         
     def speak(self, text: str):
         """
@@ -123,12 +138,15 @@ class JarvisCore:
         command = command.lower().strip()
         
         # Remove wake word if present
-        wake_words = [self.name.lower(), "jarvis", "hey"]
-        for word in wake_words:
+        for word in self.DEFAULT_WAKE_WORDS + [self.name.lower()]:
             if command.startswith(word):
                 command = command[len(word):].strip()
                 break
                 
+        # Check for alias mapping
+        if command in self.command_aliases:
+            command = self.command_aliases[command]
+        
         # Execute command handler
         if command in self.commands:
             try:
