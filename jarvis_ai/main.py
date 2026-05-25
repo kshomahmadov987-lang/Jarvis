@@ -5,10 +5,7 @@ Run this script to start Jarvis
 """
 
 import sys
-import os
-
-# Add the parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from typing import Callable
 
 from jarvis_ai import JarvisCore
 
@@ -26,27 +23,28 @@ def main():
     # Register additional custom commands
     def create_note():
         """Create a quick note."""
-        if jarvis.office_controller:
-            print("\n[NOTE MODE] Enter your note (type 'done' to finish):")
-            lines = []
-            while True:
-                line = input("> ")
-                if line.lower() == 'done':
-                    break
-                lines.append(line)
-                
-            content = "\n".join(lines)
-            filepath = jarvis.office_controller.create_word_document(
-                "quick_note", 
-                content, 
-                title="Quick Note"
-            )
-            if filepath:
-                jarvis.speak(f"Note saved to {filepath}")
-            else:
-                jarvis.speak("Failed to save note. Word support may not be available.")
-        else:
+        if not jarvis.office_controller:
             jarvis.speak("Office controller not available.")
+            return
+            
+        print("\n[NOTE MODE] Enter your note (type 'done' to finish):")
+        lines = []
+        while True:
+            line = input("> ")
+            if line.lower() == 'done':
+                break
+            lines.append(line)
+            
+        content = "\n".join(lines)
+        filepath = jarvis.office_controller.create_word_document(
+            "quick_note", 
+            content, 
+            title="Quick Note"
+        )
+        if filepath:
+            jarvis.speak(f"Note saved to {filepath}")
+        else:
+            jarvis.speak("Failed to save note. Word support may not be available.")
             
     def system_status():
         """Report detailed system status."""
@@ -58,7 +56,7 @@ def main():
         except ImportError:
             jarvis.speak("System monitor not available.")
             
-    def check_weather(city="London"):
+    def check_weather(city: str = "London"):
         """Check weather for a city."""
         try:
             from jarvis_ai.utils.weather import WeatherAPI
@@ -71,7 +69,7 @@ def main():
         except ImportError:
             jarvis.speak("Weather service not available.")
     
-    # Register custom commands
+    # Register custom commands with aliases
     jarvis.register_command("create note", create_note, aliases=["make note", "new note"])
     jarvis.register_command("system status", system_status, aliases=["status report", "check system"])
     jarvis.register_command("weather", lambda: check_weather("London"), aliases=["check weather"])
